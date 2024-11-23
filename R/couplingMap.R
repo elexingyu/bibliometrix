@@ -349,16 +349,51 @@ labeling <- function(M, df_lab, term, n, n.labels, analysis, ngrams){
 }
 
 best_lab <- function(d, tab_global, n.labels, term){
+  # Ensure the data frame is not empty and contains required columns
+  if (nrow(d) == 0 || !term %in% names(d)) {
+    cat(sprintf("No data available for term '%s' in the data frame.\n", term))
+    return(character(0))  # Return an empty character vector if data is not adequate
+  }
+
+  # Extracting table and transforming it into a data frame
   tab <- tableTag(d, term)
+  if (is.null(tab) || length(tab) == 0) {
+    cat("TableTag did not return any usable data.\n")
+    return(character(0))
+  }
+
   tab <- data.frame(label=names(tab), value=as.numeric(tab), stringsAsFactors = FALSE)
+
+  if (!"label" %in% names(tab)) {
+    cat("Label column missing in the data frame derived from tableTag.\n")
+    return(character(0))
+  }
+
+  # Perform the left join and handle potential issues
+  if (!"label" %in% names(tab_global)) {
+    cat("Global table does not contain 'label' column necessary for merging.\n")
+    return(character(0))
+  }
+
   tab <- tab %>% 
-    left_join(tab_global, by = "label") %>% 
+    left_join(tab_global, by = "label") %>%
     mutate(conf = round(.data$value/.data$tot*100,1),
            supp = round(.data$tot/n*100,1),
-           relevance = round(.data$conf*.data$supp/100,1)) %>% 
-    arrange(desc(.data$relevance)) %>% 
-    slice(1:n.labels) 
-  
-  #tolower(paste(tab$label," Supp ",tab$supp,"% - Conf ", tab$conf,"%", sep="", collapse="\n"))
-  tolower(paste(tab$label," - Conf ", tab$conf,"%", sep="", collapse="\n"))
+           relevance = round(.data$conf*.data$supp/100,1)) %>%
+    arrange(desc(.data$relevance)) %>%
+    slice(1:n.labels)
+
+  if (nrow(tab) == 0) {
+    cat("No labels were found after processing.\n")
+    return(character(0))
+  }
+
+  # Creating labels
+  labels <- tolower(paste(tab$label, " - Conf ", tab$conf, "%", sep="", collapse="\n"))
+
+  return(labels)
 }
+
+
+
+
